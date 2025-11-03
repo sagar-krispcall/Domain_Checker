@@ -156,7 +156,7 @@ try:
                 - company.com → No
             - If unsure, make your best guess based on domain reputation and online sources.
 
-        6. "website": Evaluate the domain’s website for usable business information.
+        6. "website": Evaluate the domain's website for usable business information.
             Output ONE of the following:
 
             - unreachable → Site does not load at all (HTTP errors, DNS errors, SSL issues, or redirects to unrelated sites).

@@ -144,12 +144,12 @@ try:
 
         4. "company_size": One of these EXACT options:
             - solo
-            - 1-5 employees
-            - 5-20
-            - 20-50
-            - 50-100
-            - 100-200
-            - 200-500
+            - 1 to 5 employees
+            - 5 to 20
+            - 20 to 50
+            - 50 to 100
+            - 100 to 200
+            - 200 to 500
             - 500+
 
         5. "email_provider":
@@ -186,7 +186,7 @@ try:
             "domain": "{domain}",
             "category": "Technology and software development",
             "other_industry_category": "N/A",
-            "company_size": "20-50",
+            "company_size": "20 to 50",
             "email_provider": "No",
             "website": "much_info",
             "confidence": 80
