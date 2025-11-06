@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import re
 from datetime import datetime
+import requests
+from bs4 import BeautifulSoup
 
 # ------------ Load API Keys ------------
 load_dotenv()
@@ -37,9 +39,43 @@ save_path = r'C:/SAG/Air-Channel/files(Oct21-21)/converted_users_enriched.csv'
 df = pd.read_csv(file_path)
 
 # Ensure required columns exist
-for col in ['category','company_size','email_provider','confidence','other_industry_category','website']:
+for col in ['category','company_size','email_provider','confidence','other_industry_category','website','website_status']:
     if col not in df.columns:
         df[col] = ""
+
+# ------------ Website Checking Helper Functions ------------
+def check_website(domain):
+    """
+    Check if a website is reachable and return both status and a small text sample.
+    Tries multiple URL patterns to maximize success.
+    """
+    urls_to_try = [
+        f"https://{domain}",
+        f"http://{domain}",
+        f"https://www.{domain}",
+        f"http://www.{domain}"
+    ]
+
+    for url in urls_to_try:
+        try:
+            r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code < 400 and "text/html" in r.headers.get("Content-Type", ""):
+                html_text = r.text
+                cleaned_text = clean_html(html_text)
+                return "reachable", cleaned_text[:4000]  # limit text to avoid token overflow
+        except requests.RequestException:
+            continue
+
+    return "unreachable", ""
+
+
+def clean_html(html):
+    """Remove HTML tags and scripts for plain readable text."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    text = soup.get_text(separator=" ", strip=True)
+    return re.sub(r"\s+", " ", text)
 
 # ------------ Gemini API Call Function ------------
 def call_gemini(prompt, retries=3):
@@ -107,68 +143,51 @@ try:
             continue
 
         domain = row.get('domain')
-        if not domain:
+        if not domain or pd.isna(domain):
             continue
 
         print(f"\n🌐 Processing: {domain}")
 
-        # --- Updated Prompt ---
+        # --- Check actual website reachability ---
+        site_status, site_text = check_website(domain)
+        print(f"🌍 Website status for {domain}: {site_status}")
+
+        # --- Updated Prompt with Real Site Info ---
         prompt = f"""
         You are an autonomous enrichment and classification agent. Your goal is to investigate the company behind the domain provided and return a single JSON object with accurate classifications, size estimates, confidence finding, and website evaluation.
 
         Follow all instructions carefully.
 
-        Your workflow:
+        A. Website Analysis:
+        - Visit the website {domain}.
+        - Load the site and explore sections like About, Services, Products, Contact.
+        - Extract visible text and meaningful content.
+        - If sufficient info exists, classify and stop. Otherwise, proceed to external verification.
 
-            A. First, visit the website {domain}.
-            - Attempt to load the site and explore all available sections.
-            - Extract all visible text and meaningful content (About, Services, Products, Contact, etc.).
-            - If the website provides sufficient information to confidently determine the company's category, size, and website evaluation, STOP here and use this data for classification.
+        B. External Verification:
+        - If website info is insufficient (unreachable, parked, minimal, or generic), search the domain on Google, Bing, and public directories.
+        - Review the top 10 results and cross-check information.
+        - Use this to fill missing details and improve confidence.
 
-            B. If the website provides little or no usable information (e.g., unreachable, parked, minimal, or generic content), THEN search the domain name on external platforms including Google, Bing, and public company directories.
-            - Review the top 10 search results.
-            - Collect and cross-check information about the company, ensuring the results refer to the same organization.
-            - Use this additional information to fill in missing details and improve confidence.
+        C. Python-verified input data:
+        - Website reachability: {site_status}
+        - Extracted text snippet:
+        \"\"\"{site_text}\"\"\"
+        - Use site text if reachable; otherwise rely on external knowledge.
 
-            C. Combine insights from both the website (if available) and external sources (if needed) before making your final decision.
+        D. Output Guidelines:
 
-        You must return a single JSON object following the exact structure and rules below.
+        1. "domain": exact input domain.
 
-        ---
+        2. "category": Choose ONE: Technology and Software Development, Professional Services, Marketing and Advertising, E-commerce and Retail, 
+            Financial Service, Education and e-learning, Real Estate and Property Management, Healthcare, Logistics and Transportation,
+            Manufacturing and Industrial, Other
 
-        Guidelines:
+        3. "other_industry_category": Only if "category" = Other, else "N/A". 
+            Describe the most relevant category (e.g., "Legal Services", "Travel Agency", "Non-profit", "Entertainment").
 
-        1. "domain": Return the exact domain given as input.
-
-        2. "category": Choose ONE of the following EXACT options:
-            - Technology and Software Development
-            - Professional Services
-            - Marketing and Advertising
-            - E-commerce and Retail
-            - Financial Service
-            - Education and e-learning
-            - Real Estate and Property Management
-            - Healthcare
-            - Logistics and Transportation
-            - Manufacturing and Industrial
-            - Other
-
-        3. "other_industry_category":
-            - Include this ONLY if "category" = "Other".
-            - Describe the most relevant industry type (e.g., "Legal Services", "Travel Agency", "Non-profit", "Entertainment").
-            - If "category" is not "Other", set this to "N/A".
-
-        4. "company_size": Estimate the number of employees only if reliable clues are available.
-        Choose ONE of these options:
-            - solo
-            - 1 to 5
-            - 5 to 20
-            - 20 to 50
-            - 50 to 100
-            - 100 to 200
-            - 200 to 500
-            - 500+
-        Estimation rules:
+        4. "company_size": solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, 500+, Unknown.
+            Estimation rules:
             - Use explicit info from the website, social media, or verified external profiles (e.g., “team of 8”, “over 200 employees”).
             - If no such data exists, set this to "Unknown".
             - Do NOT guess based only on design quality or website scale.
@@ -196,21 +215,21 @@ try:
                 - 0-39 → Very low confidence (no reliable info).
 
         Additional Rules:
-        - Respond ONLY with valid JSON. No markdown or explanations.
-        - Always include all keys even if uncertain ("Unknown" or "N/A" when needed).
-        - If the domain is parked or unreachable, reflect that in "website" and lower confidence.
-        - Prefer direct website data. Use external sources only when website data is missing or insufficient.
+        - Output valid JSON only, no markdown or explanations.
+        - Always include all keys, use "Unknown" or "N/A" when necessary.
+        - Use {site_status} when deciding "website".
+        - Prefer website data; use external sources only if necessary.
         - Output must start with '{{' and end with '}}'.
 
-        Example output:
+        Example:
         {{
-            "domain": "{domain}",
-            "category": "Technology and Software Development",
-            "other_industry_category": "N/A",
-            "company_size": "20 to 50",
-            "email_provider": "No",
-            "website": "much_info",
-            "confidence": 80
+        "domain": "{domain}",
+        "category": "Technology and Software Development",
+        "other_industry_category": "N/A",
+        "company_size": "20 to 50",
+        "email_provider": "No",
+        "website": "much_info",
+        "confidence": 85
         }}
 
         Domain to analyze: {domain}
@@ -238,6 +257,7 @@ try:
             df.at[idx, 'confidence'] = int(js.get('confidence', 0))
             df.at[idx, 'other_industry_category'] = js.get('other_industry_category', 'N/A')
             df.at[idx, 'website'] = js.get('website', 'Unknown')
+            df.at[idx, 'website_status'] = site_status
 
         except Exception as e:
             print(f"⚠ Error at {domain}: {e}")
@@ -247,6 +267,7 @@ try:
             df.at[idx, 'confidence'] = 0
             df.at[idx, 'other_industry_category'] = "N/A"
             df.at[idx, 'website'] = "Unknown"
+            df.at[idx, 'website_status'] = site_status
 
         # --- Save progress safely ---
         df.to_csv(save_path, index=False)
