@@ -208,12 +208,11 @@ try:
         3. "other_industry_category": Only if "category" = Other, else "N/A". 
             Describe the most relevant category (e.g., "Legal Services", "Travel Agency", "Non-profit", "Entertainment").
 
-        4. "company_size": solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, 500+, Unknown.
+        4. "company_size": solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, and 500+.
             Estimation rules:
             - Use explicit info from the website, company documents, social media, or verified external profiles.
             - Do NOT guess based only on design quality or website scale.
             - If exact number is unknown, provide the closest estimation.
-            - If no such data exists, set this to "Unknown".
 
         5. "email_provider": Identify if the domain is primarily used as an email service.
             - Output "Yes" if it is an email provider.
