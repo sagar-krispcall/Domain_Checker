@@ -1,3 +1,4 @@
+
 prompt = f"""
         You are an autonomous enrichment and classification agent. Your goal is to investigate the company behind the domain provided and return a single JSON object with accurate classifications, size estimates, confidence finding, and website evaluation.
 
@@ -31,11 +32,12 @@ prompt = f"""
         3. "other_industry_category": Only if "category" = Other, else "N/A". 
             Describe the most relevant category (e.g., "Legal Services", "Travel Agency", "Non-profit", "Entertainment").
 
-        4. "company_size": solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, 500+, Unknown.
+        4. "company_size": solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, and 500+.
             Estimation rules:
-            - Use explicit info from the website, social media, or verified external profiles (e.g., “team of 8”, “over 200 employees”).
-            - If no such data exists, set this to "Unknown".
-            - Do NOT guess based only on design quality or website scale.
+            - Estimate company size using clues such as team description, About page, customer base, LinkedIn presence, or general business type.
+            - If explicit numbers are missing, infer the **most likely range** based on wording (e.g., "our team", "global offices", "startup", "enterprise").
+            - Never output "Unknown" — always choose the **closest possible range** from: solo, 1 to 5, 5 to 20, 20 to 50, 50 to 100, 100 to 200, 200 to 500, 500+.
+            - Use "solo" if it appears to be an individual or freelancer website.
 
         5. "email_provider": Identify if the domain is primarily used as an email service.
             - Output "Yes" if it is an email provider.
@@ -61,6 +63,8 @@ prompt = f"""
 
         Additional Rules:
         - Output valid JSON only, no markdown or explanations.
+          Always provide a valid value for every field — never use "Unknown" for company_size.
+        - If company size is not explicitly mentioned, make a **best approximate guess** from available text or context.
         - Always include all keys, use "Unknown" or "N/A" when necessary.
         - Use {site_status} when deciding "website".
         - Prefer website data; use external sources only if necessary.

@@ -15,9 +15,9 @@ load_dotenv()
 api_keys = [
     os.getenv("GEMINI_API_KEY_1"),
     os.getenv("GEMINI_API_KEY_2"),
-    os.getenv("GEMINI_API_KEY_3"),
-    os.getenv("GEMINI_API_KEY_4"),
-    os.getenv("GEMINI_API_KEY_5")
+    os.getenv("GEMINI_API_KEY_3")
+    #os.getenv("GEMINI_API_KEY_4"),
+    #os.getenv("GEMINI_API_KEY_5")
 ]
 api_keys = [k for k in api_keys if k]
 if not api_keys:
@@ -33,8 +33,8 @@ configure_genai(current_key)
 print(f"🔑 Using Gemini key: {current_key[:6]}...")
 
 # ------------ Load CSV Data ------------
-file_path = r'C:/SAG/User_Domain_Analysis/Enterprise_Client/enterprise_domain(active_pay_900).csv'
-save_path = r'C:/SAG/User_Domain_Analysis/Enterprise_Client/enterprise_domain(active_pay_900)_enriched.csv'
+file_path = r'C:/SAG/User_Domain_Analysis/Enterprise_Client/enterprise_domain(active_pay_500_900).csv'
+save_path = r'C:/SAG/User_Domain_Analysis/Enterprise_Client/enterprise_domain(active_pay_500_900)_enriched.csv'
 
 df = pd.read_csv(file_path)
 
